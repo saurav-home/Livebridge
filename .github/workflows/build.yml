@@ -1,0 +1,73 @@
+name: Build and Patch LiveBridge APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Install Apktool
+      run: |
+        sudo wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool -O /usr/local/bin/apktool
+        sudo chmod +x /usr/local/bin/apktool
+        sudo wget https://github.com/iBotPeaches/Apktool/releases/download/v2.9.3/apktool_2.9.3.jar -O /usr/local/bin/apktool.jar
+        sudo chmod +x /usr/local/bin/apktool.jar
+
+    - name: Extract Project Files
+      run: |
+        # This matches the exact name of your uploaded zip file
+        unzip LiveBridge-1.2.zip -d extracted_app/
+
+    - name: Automatically Hex Edit libapp.so
+      run: |
+        python3 -c "
+        import os
+        
+        paths = [
+            'extracted_app/lib/arm64-v8a/libapp.so',
+            'extracted_app/lib/armeabi-v7a/libapp.so',
+            'extracted_app/lib/x86_64/libapp.so'
+        ]
+        
+        for file_path in paths:
+            if os.path.exists(file_path):
+                print(f'Patching {file_path}...')
+                with open(file_path, 'rb') as f:
+                    data = f.read()
+                
+                # Replace the exact byte sequences with blank spaces
+                data = data.replace(b'appsfolder.github.io/livebridge', b'                                 ')
+                data = data.replace(b'github.com/appsfolder/livebridge', b'                                ')
+                
+                with open(file_path, 'wb') as f:
+                    f.write(data)
+        "
+
+    - name: Rebuild APK
+      run: apktool b extracted_app/ -o unsigned.apk
+
+    - name: Sign APK
+      run: |
+        keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+        jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA256 -keystore debug.keystore -storepass android unsigned.apk androiddebugkey
+        mv unsigned.apk final-debug.apk
+
+    - name: Upload Finished APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: LiveBridge-Patched-APK
+        path: final-debug.apk
+        
