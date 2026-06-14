@@ -1,0 +1,40 @@
+   - name: Automatically Hex Edit libapp.so
+      run: |
+        python3 -c "
+        import os
+        
+        for root, dirs, files in os.walk('decompiled_app'):
+            if 'libapp.so' in files:
+                file_path = os.path.join(root, 'libapp.so')
+                print(f'Found and patching {file_path}...')
+                
+                with open(file_path, 'rb') as f:
+                    data = f.read()
+                
+                # 1. Update Source Link (31 bytes)
+                data = data.replace(b'appsfolder.github.io/livebridge', b'sauravbr.github.io/Livebridge//')
+                
+                # 2. Original App Link (32 bytes)
+                data = data.replace(b'github.com/appsfolder/livebridge', b'sauravbr.github.io/Livebridge///')
+                
+                # 3. Bug Report Link to Telegram
+                # We use a dummy query parameter (?p=---) to pad the length so Telegram doesn't break!
+                
+                orig_bug_1 = b'https://github.com/Spottq/livebridge/issues'
+                cust_bug_1 = b'https://t.me/Saurav124x'
+                pad_1 = len(orig_bug_1) - len(cust_bug_1)
+                if pad_1 > 0:
+                    padded_1 = cust_bug_1 + b'?p=' + (b'-' * (pad_1 - 3))
+                    data = data.replace(orig_bug_1, padded_1)
+                
+                orig_bug_2 = b'github.com/Spottq/livebridge/issues'
+                cust_bug_2 = b't.me/Saurav124x'
+                pad_2 = len(orig_bug_2) - len(cust_bug_2)
+                if pad_2 > 0:
+                    padded_2 = cust_bug_2 + b'?p=' + (b'-' * (pad_2 - 3))
+                    data = data.replace(orig_bug_2, padded_2)
+                
+                with open(file_path, 'wb') as f:
+                    f.write(data)
+        "
+
